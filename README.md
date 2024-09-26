@@ -13,13 +13,14 @@ To demo IPC, run the below, choosing a method from `tcp`, `udp`, `shmem`, `stdou
 `cargo run --release -- -n 1000 --method stdout`
 
 ```bash
-$ cargo run --release -- -n 1000 --method stdout
-    Finished release [optimized] target(s) in 0.10s
-     Running `target\release\ipc.exe -n 1000 --method stdout`
-IPC method - Stdin/stdout
-        1000 cycles completed in 33ms 58us 600ns
-        30249.863 per second
-        33us 58ns per operation
+$ cargo build --release
+$ cargo run --release -- -n 1000 --method mmap
+    Finished release [optimized] target(s) in 0.06s
+     Running `target/release/ipc -n 1000 --method mmap`
+IPC method - Memory mapped file
+	1000 cycles completed in 172us 459ns
+	5813953.5 per second
+	172ns per operation
 ```
 
 To run iceoryx, you have to start consumer process first using command
