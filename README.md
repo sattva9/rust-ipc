@@ -23,17 +23,13 @@ IPC method - Memory mapped file
 	172ns per operation
 ```
 
-To run iceoryx, you have to start consumer process first using command
-
-```bash
-cargo run --release --bin iceoryx_consumer
-```
-
 If you want to run the benchmarks, run:
 
 `cargo bench`
 
-Because the host process picks out an executable from the targets directory for the consumer, if you make changes to the consumers run `cargo build --release` to make sure they are reflected in the next execution. By default `cargo run` will only rebuild the `ipc` binrary, which only holds the producer code.
+Note:
+1. In the Divan output, the time per function will be displayed for the total number of cycles, but the throughput will be displayed per cycle. So to get timing per cycle, do t/N where N=1000(configurable).
+2. Because the host process picks out an executable from the targets directory for the consumer, if you make changes to the consumers run `cargo build --release` to make sure they are reflected in the next execution. By default `cargo run` will only rebuild the `ipc` binrary, which only holds the producer code.
 
 ## License
 

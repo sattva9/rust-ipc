@@ -1,4 +1,4 @@
-use crate::ExecutionResult;
+use crate::{get_payload, ExecutionResult, KB};
 use iceoryx2::port::publisher::Publisher;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
@@ -7,36 +7,44 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 pub struct IceoryxWrapper {
-    pub publisher: Publisher<zero_copy::Service, [u8; 4]>,
-    pub subscriber: Subscriber<zero_copy::Service, [u8; 4]>,
+    pub publisher: Publisher<ipc::Service, [u8], ()>,
+    pub subscriber: Subscriber<ipc::Service, [u8], ()>,
 }
 
 impl IceoryxWrapper {
-    pub fn new(is_producer: bool) -> IceoryxWrapper {
-        const REQUEST_SERVICE_NAME: &'static str = "Request";
-        const RESPONSE_SERVICE_NAME: &'static str = "Response";
-
-        let request_name = ServiceName::new(REQUEST_SERVICE_NAME).unwrap();
-        let request_service = zero_copy::Service::new(&request_name)
-            .publish_subscribe()
+    pub fn new(is_producer: bool, data_size: usize) -> IceoryxWrapper {
+        let node = NodeBuilder::new().create::<ipc::Service>().unwrap();
+        let request_name = ServiceName::new(&format!("Request")).unwrap();
+        let request_service = node
+            .service_builder(&request_name)
+            .publish_subscribe::<[u8]>()
             .open_or_create()
             .unwrap();
 
-        let response_name = ServiceName::new(RESPONSE_SERVICE_NAME).unwrap();
-        let response_service = zero_copy::Service::new(&response_name)
-            .publish_subscribe()
+        let response_name = ServiceName::new(&format!("Respose")).unwrap();
+        let response_service = node
+            .service_builder(&response_name)
+            .publish_subscribe::<[u8]>()
             .open_or_create()
             .unwrap();
 
         let (publisher, subscriber) = if is_producer {
             (
-                request_service.publisher().create().unwrap(),
-                response_service.subscriber().create().unwrap(),
+                request_service
+                    .publisher_builder()
+                    .max_slice_len(data_size)
+                    .create()
+                    .unwrap(),
+                response_service.subscriber_builder().create().unwrap(),
             )
         } else {
             (
-                response_service.publisher().create().unwrap(),
-                request_service.subscriber().create().unwrap(),
+                response_service
+                    .publisher_builder()
+                    .max_slice_len(data_size)
+                    .create()
+                    .unwrap(),
+                request_service.subscriber_builder().create().unwrap(),
             )
         };
 
@@ -50,37 +58,56 @@ impl IceoryxWrapper {
 pub struct IceoryxRunner {
     child_proc: Option<Child>,
     wrapper: IceoryxWrapper,
+    request_data: Vec<u8>,
+    response_data: Vec<u8>,
+    data_size: usize,
 }
 
 impl IceoryxRunner {
-    pub fn new(start_child: bool) -> IceoryxRunner {
+    pub fn new(start_child: bool, data_size: usize) -> IceoryxRunner {
+        let wrapper = IceoryxWrapper::new(true, data_size);
         let exe = crate::executable_path("iceoryx_consumer");
+
         let child_proc = if start_child {
-            Some(Command::new(exe).spawn().unwrap())
+            // None
+            Some(
+                Command::new(exe)
+                    .args(&[data_size.to_string()])
+                    .spawn()
+                    .unwrap(),
+            )
         } else {
             None
         };
         // Awkward sleep again to wait for consumer to be ready
         sleep(Duration::from_millis(1000));
 
-        let wrapper = IceoryxWrapper::new(true);
+        let (request_data, response_data) = get_payload(data_size);
+
         Self {
             child_proc,
             wrapper,
+            request_data,
+            response_data,
+            data_size,
         }
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
         let start = Instant::now();
         for _ in 0..n {
-            let sample = self.wrapper.publisher.loan_uninit().unwrap();
-            let send_payload = sample.write_payload((*b"ping").into());
-            send_payload.send().unwrap();
+            let sample = self
+                .wrapper
+                .publisher
+                .loan_slice_uninit(self.data_size)
+                .unwrap();
+            let sample = sample.write_from_slice(self.request_data.as_slice());
+            sample.send().unwrap();
 
             // Waiting for response
             loop {
                 if let Some(recv_payload) = self.wrapper.subscriber.receive().unwrap() {
-                    if !recv_payload.eq(b"pong") {
+                    if !recv_payload.eq(&self.response_data) {
                         panic!("Received unexpected payload")
                     }
                     break;
@@ -89,7 +116,8 @@ impl IceoryxRunner {
         }
         if print {
             let elapsed = start.elapsed();
-            let res = ExecutionResult::new("Iceoryx".to_string(), elapsed, n);
+            let res =
+                ExecutionResult::new(format!("Iceoryx - {}KB", self.data_size / KB), elapsed, n);
             res.print_info();
         }
     }

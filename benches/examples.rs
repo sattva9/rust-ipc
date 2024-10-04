@@ -1,7 +1,3 @@
-// This is in place to allow me to test a local Divan change
-#[cfg(feature = "dev-divan")]
-extern crate divan_dev as divan;
-
 use divan::Bencher;
 
 // This affects the number cycles of to execute each method for. In the Divan output, the
@@ -9,36 +5,26 @@ use divan::Bencher;
 // will be displayed per cycle. So to get timing per cycle, do t/N. A workaround for this
 // hopefully will be found
 const N: usize = 1000;
+const KB: usize = 1024;
+const LENS: &[usize] = &[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024];
 
 fn main() {
     divan::main();
 }
 
-// This creates the return array "holding the response" before passing it to the function
-#[divan::bench]
-fn stdin_stdout_no_preallocate(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn stdin_stdout(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut pipe_runner = ipc::pipes::PipeRunner::new(false);
+    let mut pipe_runner = ipc::pipes::PipeRunner::new(data_size * KB);
     bencher
         .counter(n)
         .bench_local(move || pipe_runner.run(n, false));
 }
 
-// This is a test as to whether it's more efficient to preallocate the return array
-#[divan::bench]
-fn stdin_stdout(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn tcp_nodelay(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut pipe_runner = ipc::pipes::PipeRunner::new(false);
-    let mut return_buffer = pipe_runner.prepare();
-    bencher
-        .counter(divan::counter::ItemsCount::new(n))
-        .bench_local(move || pipe_runner.run_inner(n, &mut return_buffer));
-}
-
-#[divan::bench]
-fn tcp_nodelay(bencher: Bencher) {
-    let n = N;
-    let mut tcp_runner = ipc::tcp::TcpRunner::new(true, true);
+    let mut tcp_runner = ipc::tcp::TcpRunner::new(true, true, data_size * KB);
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -46,10 +32,10 @@ fn tcp_nodelay(bencher: Bencher) {
         });
 }
 
-#[divan::bench]
-fn tcp_yesdelay(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn tcp_yesdelay(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut tcp_runner = ipc::tcp::TcpRunner::new(true, false);
+    let mut tcp_runner = ipc::tcp::TcpRunner::new(true, false, data_size * KB);
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -57,10 +43,10 @@ fn tcp_yesdelay(bencher: Bencher) {
         });
 }
 
-#[divan::bench]
-fn udp(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn udp(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut udp_runner = ipc::udp::UdpRunner::new(true);
+    let mut udp_runner = ipc::udp::UdpRunner::new(true, data_size * KB);
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -68,10 +54,10 @@ fn udp(bencher: Bencher) {
         });
 }
 
-#[divan::bench]
-fn shared_memory(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn shared_memory(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut shmem_runner = ipc::shmem::ShmemRunner::new(true);
+    let mut shmem_runner = ipc::shmem::ShmemRunner::new(true, data_size * KB);
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -79,10 +65,10 @@ fn shared_memory(bencher: Bencher) {
         });
 }
 
-#[divan::bench]
-fn memory_mapped_file(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn memory_mapped_file(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut mmap_runner = ipc::mmap::MmapRunner::new(true);
+    let mut mmap_runner = ipc::mmap::MmapRunner::new(true, data_size * KB);
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -90,10 +76,10 @@ fn memory_mapped_file(bencher: Bencher) {
         });
 }
 
-#[divan::bench]
-fn unix_stream(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn unix_stream(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut unix_tcp_runner = ipc::unix_stream::UnixStreamRunner::new(true);
+    let mut unix_tcp_runner = ipc::unix_stream::UnixStreamRunner::new(true, data_size * KB);
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -101,10 +87,10 @@ fn unix_stream(bencher: Bencher) {
         });
 }
 
-#[divan::bench]
-fn unix_datagram(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn unix_datagram(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut unix_udp_runner = ipc::unix_datagram::UnixDatagramRunner::new(true);
+    let mut unix_udp_runner = ipc::unix_datagram::UnixDatagramRunner::new(true, data_size * KB);
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -112,10 +98,10 @@ fn unix_datagram(bencher: Bencher) {
         });
 }
 
-#[divan::bench]
-fn iceoryx(bencher: Bencher) {
+#[divan::bench(args = LENS)]
+fn iceoryx(bencher: Bencher, data_size: usize) {
     let n = N;
-    let mut unix_udp_runner = ipc::iceoryx::IceoryxRunner::new(false);
+    let mut unix_udp_runner = ipc::iceoryx::IceoryxRunner::new(true, data_size * KB);
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
