@@ -11,8 +11,9 @@ use raw_sync::{
     events::{BusyEvent, EventImpl, EventInit, EventState},
     Timeout,
 };
+use std::io::Write;
 
-use crate::ExecutionResult;
+use crate::{get_payload, ExecutionResult, KB};
 
 pub struct MmapWrapper {
     pub mmap: MmapMut,
@@ -20,10 +21,12 @@ pub struct MmapWrapper {
     pub our_event: Box<dyn EventImpl>,
     pub their_event: Box<dyn EventImpl>,
     pub data_start: usize,
+    pub data_size: usize,
 }
 
 impl MmapWrapper {
-    pub fn new(owner: bool) -> Self {
+    pub fn new(owner: bool, data_size: usize) -> Self {
+        let data_size = data_size + 4;
         let path: PathBuf = "/tmp/mmap_data.txt".into();
         let file = OpenOptions::new()
             .read(true)
@@ -31,7 +34,7 @@ impl MmapWrapper {
             .create(true)
             .open(&path)
             .unwrap();
-        file.set_len(8).unwrap();
+        file.set_len(data_size as u64).unwrap();
 
         let mut mmap = unsafe { MmapMut::map_mut(&file).unwrap() };
         let bytes = mmap.as_mut();
@@ -67,6 +70,7 @@ impl MmapWrapper {
             our_event,
             their_event,
             data_start: 4,
+            data_size,
         }
     }
 
@@ -79,30 +83,34 @@ impl MmapWrapper {
     }
 
     pub fn write(&mut self, data: &[u8]) {
-        let bytes = self.mmap.as_mut();
-
-        for i in 0..data.len() {
-            bytes[i + self.data_start] = data[i];
-        }
+        (&mut self.mmap[self.data_start..]).write(data).unwrap();
     }
 
     pub fn read(&self) -> &[u8] {
-        &self.mmap.as_ref()[self.data_start..self.data_start + 4]
+        &self.mmap.as_ref()[self.data_start..self.data_size]
     }
 }
 
 pub struct MmapRunner {
     child_proc: Option<Child>,
     wrapper: MmapWrapper,
+    data_size: usize,
+    request_data: Vec<u8>,
+    response_data: Vec<u8>,
 }
 
 impl MmapRunner {
-    pub fn new(start_child: bool) -> Self {
-        let wrapper = MmapWrapper::new(true);
+    pub fn new(start_child: bool, data_size: usize) -> Self {
+        let wrapper = MmapWrapper::new(true, data_size);
 
         let exe = crate::executable_path("mmap_consumer");
         let child_proc = if start_child {
-            let res = Some(Command::new(exe).spawn().unwrap());
+            let res = Some(
+                Command::new(exe)
+                    .args(&[data_size.to_string()])
+                    .spawn()
+                    .unwrap(),
+            );
             // Clumsy sleep here but it allows the child proc to spawn without it having to offer
             // us a ready event
             sleep(Duration::from_secs(2));
@@ -110,9 +118,15 @@ impl MmapRunner {
         } else {
             None
         };
+
+        let (request_data, response_data) = get_payload(data_size);
+
         Self {
             child_proc,
             wrapper,
+            data_size,
+            request_data,
+            response_data,
         }
     }
 
@@ -121,21 +135,27 @@ impl MmapRunner {
         for _ in 0..n {
             // Activate our lock in preparation for writing
             self.wrapper.signal_start();
-            self.wrapper.write(b"ping");
+            self.wrapper.write(&self.request_data);
             // Unlock after writing
             self.wrapper.signal_finished();
             // Wait for their lock to be released so we can read
             if self.wrapper.their_event.wait(Timeout::Infinite).is_ok() {
                 let str = self.wrapper.read();
-                if str != b"pong" {
-                    panic!("Sent ping didn't get pong")
+                if str != &self.response_data {
+                    println!("{}", String::from_utf8_lossy(&self.response_data));
+                    println!("{}", String::from_utf8_lossy(&str));
+                    panic!("Sent request didn't get response")
                 }
             }
         }
         let elapsed = instant.elapsed();
 
         if print {
-            let res = ExecutionResult::new(format!("Memory mapped file"), elapsed, n);
+            let res = ExecutionResult::new(
+                format!("Memory mapped file - {}KB", self.data_size / KB),
+                elapsed,
+                n,
+            );
             res.print_info();
         }
     }

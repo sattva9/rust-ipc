@@ -1,4 +1,4 @@
-use crate::ExecutionResult;
+use crate::{get_payload, ExecutionResult, KB};
 use raw_sync::events::{BusyEvent, EventImpl, EventInit, EventState};
 use raw_sync::Timeout;
 use shared_memory::{Shmem, ShmemConf};
@@ -6,8 +6,8 @@ use std::process::{Child, Command};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-fn shmem_conf() -> ShmemConf {
-    let shmem = ShmemConf::new().size(8);
+fn shmem_conf(data_size: usize) -> ShmemConf {
+    let shmem = ShmemConf::new().size(data_size);
     shmem
 }
 
@@ -17,15 +17,17 @@ pub struct ShmemWrapper {
     pub our_event: Box<dyn EventImpl>,
     pub their_event: Box<dyn EventImpl>,
     pub data_start: usize,
+    pub data_size: usize,
 }
 
 impl ShmemWrapper {
-    pub fn new(handle: Option<String>) -> ShmemWrapper {
+    pub fn new(handle: Option<String>, data_size: usize) -> ShmemWrapper {
+        let data_size = data_size + 4;
         let owner = handle.is_none();
         // If we've been given a memory handle, attach it, if not, create one
         let mut shmem = match handle {
-            None => shmem_conf().create().unwrap(),
-            Some(h) => shmem_conf()
+            None => shmem_conf(data_size).create().unwrap(),
+            Some(h) => shmem_conf(data_size)
                 .os_id(&h)
                 .open()
                 .expect(&format!("Unable to open the shared memory at {}", h)),
@@ -60,6 +62,7 @@ impl ShmemWrapper {
             our_event,
             their_event,
             data_start: 4,
+            data_size,
         }
     }
 
@@ -70,7 +73,7 @@ impl ShmemWrapper {
         self.our_event.set(EventState::Signaled).unwrap()
     }
 
-    pub fn write(&mut self, data: &[u8; 4]) {
+    pub fn write(&mut self, data: &[u8]) {
         let bytes = unsafe { self.shmem.as_slice_mut() };
 
         for i in 0..data.len() {
@@ -79,24 +82,32 @@ impl ShmemWrapper {
     }
 
     pub fn read(&self) -> &[u8] {
-        unsafe { &self.shmem.as_slice()[self.data_start..self.data_start + 4] }
+        unsafe { &self.shmem.as_slice()[self.data_start..self.data_size] }
     }
 }
 
 // #[derive(Debug)]
 pub struct ShmemRunner {
-    pub child_proc: Option<Child>,
-    pub wrapper: ShmemWrapper,
+    child_proc: Option<Child>,
+    wrapper: ShmemWrapper,
+    data_size: usize,
+    request_data: Vec<u8>,
+    response_data: Vec<u8>,
 }
 
 impl ShmemRunner {
-    pub fn new(start_child: bool) -> ShmemRunner {
-        let wrapper = ShmemWrapper::new(None);
+    pub fn new(start_child: bool, data_size: usize) -> ShmemRunner {
+        let wrapper = ShmemWrapper::new(None, data_size);
 
         let id = wrapper.shmem.get_os_id();
         let exe = crate::executable_path("shmem_consumer");
         let child_proc = if start_child {
-            let res = Some(Command::new(exe).args(&[id]).spawn().unwrap());
+            let res = Some(
+                Command::new(exe)
+                    .args(&[id.to_string(), data_size.to_string()])
+                    .spawn()
+                    .unwrap(),
+            );
             // Clumsy sleep here but it allows the child proc to spawn without it having to offer
             // us a ready event
             sleep(Duration::from_secs(1));
@@ -104,9 +115,15 @@ impl ShmemRunner {
         } else {
             None
         };
+
+        let (request_data, response_data) = get_payload(data_size);
+
         ShmemRunner {
             child_proc,
             wrapper,
+            data_size,
+            request_data,
+            response_data,
         }
     }
 
@@ -115,21 +132,25 @@ impl ShmemRunner {
         for _ in 0..n {
             // Activate our lock in preparation for writing
             self.wrapper.signal_start();
-            self.wrapper.write(b"ping");
+            self.wrapper.write(&self.request_data);
             // Unlock after writing
             self.wrapper.signal_finished();
             // Wait for their lock to be released so we can read
             if self.wrapper.their_event.wait(Timeout::Infinite).is_ok() {
                 let str = self.wrapper.read();
-                if str != b"pong" {
-                    panic!("Sent ping didn't get pong")
+                if str != &self.response_data {
+                    panic!("Sent request didn't get response")
                 }
             }
         }
         let elapsed = instant.elapsed();
 
         if print {
-            let res = ExecutionResult::new("Shared memory".to_string(), elapsed, n);
+            let res = ExecutionResult::new(
+                format!("Shared memory - {}KB", self.data_size / KB),
+                elapsed,
+                n,
+            );
             res.print_info();
         }
     }
