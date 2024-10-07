@@ -7,6 +7,8 @@ fn main() {
     let handle = &args[1];
     let data_size = usize::from_str(&args[2]).unwrap();
 
+    core_affinity::set_for_current(core_affinity::CoreId { id: 0 });
+
     // First two bytes is the producer busy event, second two bytes is the consumer busy event.
     // The rest is our message
     let mut wrapper = ipc::shmem::ShmemWrapper::new(Some(handle.clone()), data_size);
@@ -14,14 +16,15 @@ fn main() {
 
     loop {
         if wrapper.their_event.wait(Timeout::Infinite).is_ok() {
-            let _data = wrapper.read();
-            if wrapper.read() == &request_data {
-                wrapper.signal_start();
-                wrapper.write(&response_data);
-                wrapper.signal_finished();
-            } else {
+            let data = wrapper.read();
+            #[cfg(debug_assertions)]
+            if data.ne(&request_data) {
                 panic!("Didn't receive valid request")
             }
+
+            wrapper.signal_start();
+            wrapper.write(&response_data);
+            wrapper.signal_finished();
         }
     }
 }

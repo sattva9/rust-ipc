@@ -5,12 +5,15 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let data_size = usize::from_str(&args[1]).unwrap();
 
+    core_affinity::set_for_current(core_affinity::CoreId { id: 0 });
+
     let wrapper = ipc::iceoryx::IceoryxWrapper::new(false, data_size);
     let (request_data, response_data) = get_payload(data_size);
 
     loop {
         if let Some(recv_payload) = wrapper.subscriber.receive().unwrap() {
-            if !recv_payload.eq(&request_data) {
+            #[cfg(debug_assertions)]
+            if recv_payload.ne(&request_data) {
                 panic!("Received unexpected payload")
             }
 

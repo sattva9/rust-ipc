@@ -7,6 +7,8 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let data_size = usize::from_str(&args[1]).unwrap();
 
+    core_affinity::set_for_current(core_affinity::CoreId { id: 0 });
+
     let (request_data, response_data) = get_payload(data_size);
     let error = "Error".to_string().as_bytes().to_vec();
 

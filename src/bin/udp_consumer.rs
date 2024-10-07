@@ -8,6 +8,8 @@ fn main() {
     let their_port = u16::from_str(&args[1]).unwrap();
     let data_size = usize::from_str(&args[3]).unwrap();
 
+    core_affinity::set_for_current(core_affinity::CoreId { id: 0 });
+
     let socket_wrapper = ipc::udp::UdpStreamWrapper::from_port(our_port, data_size);
     socket_wrapper
         .socket

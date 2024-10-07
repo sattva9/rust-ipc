@@ -1,4 +1,5 @@
 use divan::Bencher;
+use ipc::cpu_warmup;
 
 // This affects the number cycles of to execute each method for. In the Divan output, the
 // time per function will be displayed for the total number of cycles, but the throughput
@@ -16,6 +17,8 @@ fn main() {
 fn stdin_stdout(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut pipe_runner = ipc::pipes::PipeRunner::new(data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(n)
         .bench_local(move || pipe_runner.run(n, false));
@@ -25,6 +28,8 @@ fn stdin_stdout(bencher: Bencher, data_size: usize) {
 fn tcp_nodelay(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut tcp_runner = ipc::tcp::TcpRunner::new(true, true, data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -36,6 +41,8 @@ fn tcp_nodelay(bencher: Bencher, data_size: usize) {
 fn tcp_yesdelay(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut tcp_runner = ipc::tcp::TcpRunner::new(true, false, data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -47,6 +54,8 @@ fn tcp_yesdelay(bencher: Bencher, data_size: usize) {
 fn udp(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut udp_runner = ipc::udp::UdpRunner::new(true, data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -58,6 +67,8 @@ fn udp(bencher: Bencher, data_size: usize) {
 fn shared_memory(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut shmem_runner = ipc::shmem::ShmemRunner::new(true, data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -69,6 +80,8 @@ fn shared_memory(bencher: Bencher, data_size: usize) {
 fn memory_mapped_file(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut mmap_runner = ipc::mmap::MmapRunner::new(true, data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -80,6 +93,8 @@ fn memory_mapped_file(bencher: Bencher, data_size: usize) {
 fn unix_stream(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut unix_tcp_runner = ipc::unix_stream::UnixStreamRunner::new(true, data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -91,6 +106,8 @@ fn unix_stream(bencher: Bencher, data_size: usize) {
 fn unix_datagram(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut unix_udp_runner = ipc::unix_datagram::UnixDatagramRunner::new(true, data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {
@@ -102,6 +119,8 @@ fn unix_datagram(bencher: Bencher, data_size: usize) {
 fn iceoryx(bencher: Bencher, data_size: usize) {
     let n = N;
     let mut unix_udp_runner = ipc::iceoryx::IceoryxRunner::new(true, data_size * KB);
+
+    cpu_warmup();
     bencher
         .counter(divan::counter::ItemsCount::new(n))
         .bench_local(move || {

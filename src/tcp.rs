@@ -78,12 +78,16 @@ impl TcpRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
+        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
+
         let start = Instant::now();
         let mut buf = vec![0; self.data_size];
         for _ in 0..n {
             self.wrapper.stream.write(&self.request_data).unwrap();
             self.wrapper.stream.read_exact(&mut buf).unwrap();
-            if !buf.eq(&self.response_data) {
+
+            #[cfg(debug_assertions)]
+            if buf.ne(&self.response_data) {
                 panic!("Sent request didn't get response")
             }
         }

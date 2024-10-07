@@ -126,6 +126,8 @@ impl UdpRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
+        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
+
         let start = Instant::now();
         for _ in 0..n {
             self.wrapper.send(&self.request_data);

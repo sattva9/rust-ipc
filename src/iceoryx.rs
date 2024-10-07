@@ -94,6 +94,8 @@ impl IceoryxRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
+        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
+
         let start = Instant::now();
         for _ in 0..n {
             let sample = self
@@ -107,9 +109,11 @@ impl IceoryxRunner {
             // Waiting for response
             loop {
                 if let Some(recv_payload) = self.wrapper.subscriber.receive().unwrap() {
-                    if !recv_payload.eq(&self.response_data) {
-                        panic!("Received unexpected payload")
+                    #[cfg(debug_assertions)]
+                    if recv_payload.ne(&self.response_data) {
+                        panic!("Sent request didn't get response")
                     }
+
                     break;
                 }
             }

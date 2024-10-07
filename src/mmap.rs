@@ -131,6 +131,8 @@ impl MmapRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
+        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
+
         let instant = Instant::now();
         for _ in 0..n {
             // Activate our lock in preparation for writing
@@ -141,9 +143,9 @@ impl MmapRunner {
             // Wait for their lock to be released so we can read
             if self.wrapper.their_event.wait(Timeout::Infinite).is_ok() {
                 let str = self.wrapper.read();
-                if str != &self.response_data {
-                    println!("{}", String::from_utf8_lossy(&self.response_data));
-                    println!("{}", String::from_utf8_lossy(&str));
+
+                #[cfg(debug_assertions)]
+                if str.ne(&self.response_data) {
                     panic!("Sent request didn't get response")
                 }
             }
