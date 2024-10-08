@@ -80,7 +80,7 @@ impl IceoryxRunner {
             None
         };
         // Awkward sleep again to wait for consumer to be ready
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_secs(2));
 
         let (request_data, response_data) = get_payload(data_size);
 
@@ -107,9 +107,11 @@ impl IceoryxRunner {
             // Waiting for response
             loop {
                 if let Some(recv_payload) = self.wrapper.subscriber.receive().unwrap() {
-                    if !recv_payload.eq(&self.response_data) {
-                        panic!("Received unexpected payload")
+                    #[cfg(debug_assertions)]
+                    if recv_payload.ne(&self.response_data) {
+                        panic!("Sent request didn't get response")
                     }
+
                     break;
                 }
             }

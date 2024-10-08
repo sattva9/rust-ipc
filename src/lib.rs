@@ -36,6 +36,15 @@ pub fn get_payload(data_size: usize) -> (Vec<u8>, Vec<u8>) {
     (request_data, response_data)
 }
 
+pub fn cpu_warmup() {
+    let warmup = std::time::Instant::now();
+    loop {
+        if warmup.elapsed() > std::time::Duration::from_millis(1000) {
+            break;
+        }
+    }
+}
+
 pub struct ExecutionResult {
     name: String,
     elapsed: Duration,

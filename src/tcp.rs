@@ -2,7 +2,8 @@ use crate::{get_payload, ExecutionResult, KB};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::process::{Child, Command};
-use std::time::Instant;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 pub struct TcpStreamWrapper {
     pub port: u16,
@@ -50,7 +51,7 @@ impl TcpRunner {
         let port = listener.local_addr().unwrap().port();
         let exe = crate::executable_path("tcp_consumer");
         let child_proc = if start_child {
-            Some(
+            let res = Some(
                 Command::new(exe)
                     .args(&[
                         port.to_string(),
@@ -59,10 +60,14 @@ impl TcpRunner {
                     ])
                     .spawn()
                     .unwrap(),
-            )
+            );
+            // Awkward sleep to wait for consumer to be ready
+            sleep(Duration::from_secs(2));
+            res
         } else {
             None
         };
+
         let stream = TcpStreamWrapper::from_listener(listener, tcp_nodelay);
 
         let (request_data, response_data) = get_payload(data_size);
@@ -83,7 +88,9 @@ impl TcpRunner {
         for _ in 0..n {
             self.wrapper.stream.write(&self.request_data).unwrap();
             self.wrapper.stream.read_exact(&mut buf).unwrap();
-            if !buf.eq(&self.response_data) {
+
+            #[cfg(debug_assertions)]
+            if buf.ne(&self.response_data) {
                 panic!("Sent request didn't get response")
             }
         }

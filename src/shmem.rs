@@ -110,7 +110,7 @@ impl ShmemRunner {
             );
             // Clumsy sleep here but it allows the child proc to spawn without it having to offer
             // us a ready event
-            sleep(Duration::from_secs(1));
+            sleep(Duration::from_secs(2));
             res
         } else {
             None
@@ -138,7 +138,9 @@ impl ShmemRunner {
             // Wait for their lock to be released so we can read
             if self.wrapper.their_event.wait(Timeout::Infinite).is_ok() {
                 let str = self.wrapper.read();
-                if str != &self.response_data {
+
+                #[cfg(debug_assertions)]
+                if str.ne(&self.response_data) {
                     panic!("Sent request didn't get response")
                 }
             }

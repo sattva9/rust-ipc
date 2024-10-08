@@ -16,6 +16,7 @@ iceoryx2 = "0.4.1"
 memmap2 = "0.9.4"
 os_pipe = "1.2.1"
 rand = "0.8.5"
+core_affinity = "=0.6.1"
 
 [dev-dependencies]
 divan = "0.1.14"

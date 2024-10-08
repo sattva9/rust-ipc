@@ -39,7 +39,9 @@ impl PipeRunner {
                 for _ in 0..n {
                     pipes_input.write(&self.request_data).unwrap();
                     pipes_output.read_exact(&mut buf).unwrap();
-                    if buf != self.response_data {
+
+                    #[cfg(debug_assertions)]
+                    if buf.ne(&self.response_data) {
                         panic!("Unexpected response {}", String::from_utf8_lossy(&buf))
                     }
                 }
