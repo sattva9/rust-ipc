@@ -110,7 +110,7 @@ impl ShmemRunner {
             );
             // Clumsy sleep here but it allows the child proc to spawn without it having to offer
             // us a ready event
-            sleep(Duration::from_secs(1));
+            sleep(Duration::from_secs(2));
             res
         } else {
             None
@@ -128,8 +128,6 @@ impl ShmemRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
-        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
-
         let instant = Instant::now();
         for _ in 0..n {
             // Activate our lock in preparation for writing

@@ -1,4 +1,4 @@
-use ipc::get_payload;
+use ipc::{cpu_warmup, get_payload};
 use raw_sync::Timeout;
 use std::str::FromStr;
 
@@ -13,6 +13,8 @@ fn main() {
     // The rest is our message
     let mut wrapper = ipc::shmem::ShmemWrapper::new(Some(handle.clone()), data_size);
     let (request_data, response_data) = get_payload(data_size);
+
+    cpu_warmup();
 
     loop {
         if wrapper.their_event.wait(Timeout::Infinite).is_ok() {

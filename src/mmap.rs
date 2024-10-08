@@ -131,8 +131,6 @@ impl MmapRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
-        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
-
         let instant = Instant::now();
         for _ in 0..n {
             // Activate our lock in preparation for writing

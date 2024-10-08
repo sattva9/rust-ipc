@@ -108,7 +108,7 @@ impl UdpRunner {
             None
         };
         // Awkward sleep to make sure the child proc is ready
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_secs(2));
         wrapper
             .socket
             .connect(format!("127.0.0.1:{}", their_port))
@@ -126,8 +126,6 @@ impl UdpRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
-        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
-
         let start = Instant::now();
         for _ in 0..n {
             self.wrapper.send(&self.request_data);

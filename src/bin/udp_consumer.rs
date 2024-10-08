@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ipc::get_payload;
+use ipc::{cpu_warmup, get_payload};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -17,6 +17,8 @@ fn main() {
         .unwrap();
 
     let (_request_data, response_data) = get_payload(data_size);
+
+    cpu_warmup();
 
     loop {
         let _request = socket_wrapper.recv();

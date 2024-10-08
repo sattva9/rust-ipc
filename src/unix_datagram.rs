@@ -78,18 +78,19 @@ impl UnixDatagramRunner {
 
         let exe = crate::executable_path("unix_datagram_consumer");
         let child_proc = if start_child {
-            Some(
+            let res = Some(
                 Command::new(exe)
                     .args(&[data_size.to_string()])
                     .spawn()
                     .unwrap(),
-            )
+            );
+            // Awkward sleep to wait for consumer to be ready
+            sleep(Duration::from_secs(2));
+            res
         } else {
             None
         };
 
-        // Awkward sleep to make sure the child proc is ready
-        sleep(Duration::from_millis(500));
         wrapper.connect_to_peer();
 
         let (request_data, response_data) = get_payload(data_size);
@@ -104,8 +105,6 @@ impl UnixDatagramRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
-        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
-
         let start = Instant::now();
         for _ in 0..n {
             self.wrapper.send(&self.request_data);

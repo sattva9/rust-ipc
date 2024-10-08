@@ -80,7 +80,7 @@ impl IceoryxRunner {
             None
         };
         // Awkward sleep again to wait for consumer to be ready
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_secs(2));
 
         let (request_data, response_data) = get_payload(data_size);
 
@@ -94,8 +94,6 @@ impl IceoryxRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
-        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
-
         let start = Instant::now();
         for _ in 0..n {
             let sample = self

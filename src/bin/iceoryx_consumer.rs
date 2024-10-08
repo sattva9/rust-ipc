@@ -1,4 +1,4 @@
-use ipc::get_payload;
+use ipc::{cpu_warmup, get_payload};
 use std::str::FromStr;
 
 fn main() {
@@ -9,6 +9,8 @@ fn main() {
 
     let wrapper = ipc::iceoryx::IceoryxWrapper::new(false, data_size);
     let (request_data, response_data) = get_payload(data_size);
+
+    cpu_warmup();
 
     loop {
         if let Some(recv_payload) = wrapper.subscriber.receive().unwrap() {

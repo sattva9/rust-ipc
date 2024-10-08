@@ -33,8 +33,6 @@ impl PipeRunner {
     }
 
     pub fn run_inner(&mut self, n: usize) {
-        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
-
         if let Some(ref mut pipes_input) = self.pipe_proc.stdin {
             if let Some(ref mut pipes_output) = self.pipe_proc.stdout {
                 let mut buf = vec![0; self.data_size];

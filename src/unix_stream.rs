@@ -2,7 +2,8 @@ use std::{
     io::{Read, Write},
     os::unix::net::{UnixListener, UnixStream},
     process::{Child, Command},
-    time::Instant,
+    thread::sleep,
+    time::{Duration, Instant},
 };
 
 use crate::{get_payload, ExecutionResult, KB};
@@ -38,12 +39,15 @@ impl UnixStreamRunner {
         let unix_listener = UnixListener::bind(UNIX_SOCKET_PATH).unwrap();
         let exe = crate::executable_path("unix_stream_consumer");
         let child_proc = if start_child {
-            Some(
+            let res = Some(
                 Command::new(exe)
                     .args(&[data_size.to_string()])
                     .spawn()
                     .unwrap(),
-            )
+            );
+            // Awkward sleep to wait for consumer to be ready
+            sleep(Duration::from_secs(2));
+            res
         } else {
             None
         };
@@ -62,11 +66,9 @@ impl UnixStreamRunner {
     }
 
     pub fn run(&mut self, n: usize, print: bool) {
-        core_affinity::set_for_current(core_affinity::CoreId { id: 1 });
-
         let start = Instant::now();
         let mut buf = vec![0; self.data_size];
-        for i in 0..n {
+        for _ in 0..n {
             self.wrapper.stream.write(&self.request_data).unwrap();
             self.wrapper.stream.read_exact(&mut buf).unwrap();
 
