@@ -4,7 +4,7 @@ This is a small proof of concept project for different approaches to Interproces
 
 This has been built upon the work by [3tilley](https://github.com/3tilley/rust-experiments/tree/master/ipc).
 
-It accompanies a blog post [here](https://pranitha.rs/posts/rust-ipc-ping-pong/).
+It accompanies a blog post [here](https://pranitha.dev/posts/rust-ipc-ping-pong/).
 
 ## Usage
 
